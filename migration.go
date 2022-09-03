@@ -100,10 +100,10 @@ func (m *Migration) run(db *sql.DB, direction bool) error {
 			if m.noVersioning {
 				return nil
 			}
-			return insertOrDeleteVersionNoTx(db, direction, m.Version)
-		}
-
-		if fn != nil {
+			if err := insertOrDeleteVersionNoTx(db, direction, m.Version); err != nil {
+				return err
+			}
+		} else if fn != nil {
 			// Run Go migration function.
 			tx, err := db.Begin()
 			if err != nil {
@@ -131,7 +131,9 @@ func (m *Migration) run(db *sql.DB, direction bool) error {
 					return err
 				}
 			}
-			return tx.Commit()
+			if err := tx.Commit(); err != nil {
+				return err
+			}
 		}
 
 		if fn != nil || fnNoTx != nil {
@@ -151,6 +153,7 @@ func insertOrDeleteVersionNoTx(db *sql.DB, direction bool, version int64) error 
 		if _, err := db.Exec(GetDialect().insertVersionSQL(), version, direction); err != nil {
 			return err
 		}
+		return nil
 	}
 	_, err := db.Exec(GetDialect().deleteVersionSQL(), version)
 	return err
@@ -161,6 +164,7 @@ func insertOrDeleteVersion(tx *sql.Tx, direction bool, version int64) error {
 		if _, err := tx.Exec(GetDialect().insertVersionSQL(), version, direction); err != nil {
 			return err
 		}
+		return nil
 	}
 	_, err := tx.Exec(GetDialect().deleteVersionSQL(), version)
 	return err
